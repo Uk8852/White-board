@@ -9,7 +9,7 @@ import { GiLaserBurst } from "react-icons/gi";
 import { LuEraser } from "react-icons/lu";
 import { HiCursorClick } from "react-icons/hi";
 
-function Tools({ currentTool, onClick }) {
+function Tools({ currentTool, onClick, setColor, selectedColor }) {
     const tools = [
         {
             name: "Pen",
@@ -59,17 +59,29 @@ function Tools({ currentTool, onClick }) {
         }
 
     ]
+    const colors = ['#000000', '#FF0000', '#0000FF', '#00FF00'];
     return (
-        <div className='w-[80px] h-[90vh] bg-white rounded-3xl py-6 gap-4 z-[100]'>
+        <div className='w-[80px] h-[90vh] bg-white rounded-3xl py-6 gap-4 z-[100] flex flex-col'>
             {tools.map((tool, index) => {
                 const isSelected = currentTool == tool.type
-                return <div className={`p-3 rounded-xl cursor-pointer transition-all duration-200 
+                return <div className={`p-3 rounded-xl cursor-pointer transition-all duration-200
                 ease-in-out group shadow-xl shadow-gray-300 ${isSelected ? "bg-blue-100" : "hover:bg-gray-100"}`
                 } key={index} onClick={() => onClick(tool)}>
                     <tool.tool className={`w-6 h-6 transition-colors duration-200
                          ${isSelected ? "text-blue-600" : "text-gray-600 group-hover:bg-blue-600"}`} />
                 </div>
             })}
+            <div className='mt-4 flex flex-col gap-2'>
+                {colors.map((color, index) => (
+                    <div
+                        key={index}
+                        className={`w-8 h-8 rounded-full cursor-pointer border-2 ${selectedColor === color ? 'border-gray-800' : 'border-gray-300'}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setColor(color)}
+                    />
+                ))}
+            </div>
+
         </div>
     )
 }

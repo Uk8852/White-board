@@ -1,23 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { ZegoSuperBoardManager } from 'zego-superboard-web';
-import { ZegoExpressEngine } from 'zego-express-engine-webrtc';
+import { useEffect, useState } from 'react';
 import Tools from './Tools.jsx';
 
 function App() {
-  const appID = 1340062281;
+  const appID = 1360633089;
   const userID = "utkarsh";
   const roomID = "1254";
   const userName = "Utkarsh Kumar";
   const [currentTool, setCurrentTool] = useState(null);
   const [zegoSuperBoard, setZegoSuperBoard] = useState(null);
+  const [connectionError, setConnectionError] = useState(null);
+  const [selectedColor, setSelectedColor] = useState('#000000');
+  const [backgroundColor, setBackgroundColor] = useState('#FFFFFF');
 
   const token =
-    "04AAAAAGjNfUMADAT3GUjbTXZAwL+FogCyQyvfggL40l2eAZOT49UutEATio2WnuYoJVERfv8GHVAz1qzbt36K8DFZNANLiGJNPeHqEkoRWzATaZs4BkPDeQJAThCBxZAaNbynhBdHKNhNZM/Zlvsjei4zz16fd8lA1zC/whUZ1aKK5L9U+lgdOS6+QrJcLs+SY5AksOa+iawWS8HbRCx/8+ACnQsWcPLOwXr3S+rQS5+FxK9/UvRNFG3tvhZlsFdMQK9/tSC9x+zRBAE=";
+"04AAAAAGlpQKQADIUqnXmtiuG46AsOQwCwKX/sKlA9JwnC/DgjcsTGtYnqhLbTRDb10q4F8kD1eDOPgwjYg8pj6S4MAYsc/BVkETXlowx98kSGkRx7oTnxyeJfs5KDMvVQBF40DtWQpLbEoS+fqITJ9wp3Wjevwh1Q2lPrNj2m3RHUOsuHs9jvRUqxIjVUfokhSicgy83Gsr0UyzWVFL1NNy9iNHYyhEnDlZ+79+2M0W7U6D0Yt372/KfbSSD4hLs52YN/BPYphiUB"
+  const server = "wss://webliveroom1360633089-api.coolzcloud.com/ws"
 
-  const server = "wss://webliveroom1340062281-api.coolzcloud.com/ws";
-
-  const zg = new ZegoExpressEngine(appID, server);
   const initBoard = async () => {
+    const { ZegoSuperBoardManager } = await import('zego-superboard-web');
+    const { ZegoExpressEngine } = await import('zego-express-engine-webrtc');
+
+    const zg = new ZegoExpressEngine(appID, server);
     const superBoard = ZegoSuperBoardManager.getInstance();
 
     await superBoard.init(zg, {
@@ -27,12 +30,20 @@ function App() {
       token,
     });
 
-    await zg.loginRoom(
-      roomID,
-      token,
-      { userID: userID, userName: userName },
-      { userUpdate: true }
-    );
+      try {
+        await zg.loginRoom(
+          roomID,
+          token,
+          { userID: userID, userName: userName },
+          { userUpdate: true }
+        );
+        console.log('loginRoom succeeded');
+        setConnectionError(null);
+      } catch (err) {
+        console.error('loginRoom failed:', err);
+        setConnectionError(err || String(err));
+        return;
+      }
 
     await superBoard.createWhiteboardView({
       name: 'Virtual Board',
@@ -43,29 +54,156 @@ function App() {
 
     setZegoSuperBoard(superBoard);
     setCurrentTool(superBoard.getToolType());
+    try {
+      console.log('SuperBoard initialized. keys:', Object.keys(superBoard));
+      try {
+        console.log('Initial tool type (getToolType):', superBoard.getToolType && superBoard.getToolType());
+      } catch (e) {
+        console.warn('Error calling getToolType on SuperBoard:', e);
+      }
+      try { window.__zegoSuperBoard = superBoard; } catch (e) {}
+    } catch (e) {
+      console.warn('Could not log SuperBoard debug info:', e);
+    }
   };
 
   useEffect(() => {
     initBoard();
   }, []);
 
+  const formatError = (err) => {
+    if (!err) return '';
+    try {
+      if (typeof err === 'string') return err;
+      return JSON.stringify(err, Object.getOwnPropertyNames(err), 2);
+    } catch (e) {
+      try { return String(err); } catch { return 'Unknown error'; }
+    }
+  };
+
   const handleToolClick = (tool) => {
+    console.log('Tool clicked:', tool);
+    if (!zegoSuperBoard) {
+      console.warn('SuperBoard not initialized yet!');
+      setCurrentTool(tool.type);
+      return;
+    }
+
+    try {
+      const tryCall = (fn, arg) => {
+        try {
+          const r = fn(arg);
+          if (r && typeof r.then === 'function') return r;
+          return Promise.resolve(r);
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      };
+
+      const candidates = [];
+      if (typeof (window.__zegoSuperBoard && window.__zegoSuperBoard.setTool) === 'function') candidates.push((t) => zegoSuperBoard.setTool(t));
+      if (typeof (window.__zegoSuperBoard && window.__zegoSuperBoard.setToolType) === 'function') candidates.push((t) => zegoSuperBoard.setToolType(t));
+      if (typeof (window.__zegoSuperBoard && window.__zegoSuperBoard.getCurrentView) === 'function') candidates.push((t) => zegoSuperBoard.getCurrentView().setToolType(t));
+      if (typeof (window.__zegoSuperBoard && window.__zegoSuperBoard.getCurrentBoard) === 'function') candidates.push((t) => zegoSuperBoard.getCurrentBoard().setToolType(t));
+      if (typeof zegoSuperBoard.getView === 'function') candidates.push((t) => zegoSuperBoard.getView().setToolType(t));
+
+      if (candidates.length === 0) {
+        console.warn('No known setTool method found on SuperBoard. Object keys:', Object.keys(zegoSuperBoard));
+        setCurrentTool(tool.type);
+        return;
+      }
+
+      // Try candidates sequentially until one succeeds
+      (async () => {
+        for (const fn of candidates) {
+          try {
+            const res = tryCall(fn, tool.type);
+            await res;
+            console.log('Tool applied via candidate, type=', tool.type);
+            setCurrentTool(tool.type);
+            return;
+          } catch (err) {
+            console.debug('candidate failed:', err);
+            // try next
+          }
+        }
+        console.warn('All candidate methods failed to apply tool. SuperBoard object:', zegoSuperBoard);
+        setCurrentTool(tool.type);
+      })();
+    } catch (e) {
+      console.error('Error applying tool:', e, 'SuperBoard:', zegoSuperBoard);
+      setCurrentTool(tool.type);
+    }
+
+    console.log('after click - getToolType:', window.__zegoSuperBoard && window.__zegoSuperBoard.getToolType && window.__zegoSuperBoard.getToolType());
+    console.log('after click - viewToolType:', window.__zegoSuperBoard && window.__zegoSuperBoard.getCurrentView && window.__zegoSuperBoard.getCurrentView().getToolType && window.__zegoSuperBoard.getCurrentView().getToolType());
+  };
+
+  const setColor = (color) => {
+    console.log('Color selected:', color);
+    setSelectedColor(color);
     if (!zegoSuperBoard) {
       console.warn('SuperBoard not initialized yet!');
       return;
     }
-    
-    zegoSuperBoard.setToolType(tool.type);
-    setCurrentTool(tool.type);
+    // Try to set brush color
+    try {
+      const tryCall = (fn, arg) => {
+        try {
+          const r = fn(arg);
+          if (r && typeof r.then === 'function') return r;
+          return Promise.resolve(r);
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      };
+
+      const candidates = [];
+      if (typeof (window.__zegoSuperBoard && window.__zegoSuperBoard.setBrushColor) === 'function') candidates.push((c) => zegoSuperBoard.setBrushColor(c));
+      if (typeof (window.__zegoSuperBoard && window.__zegoSuperBoard.getCurrentView) === 'function') candidates.push((c) => zegoSuperBoard.getCurrentView().setBrushColor(c));
+      if (typeof (window.__zegoSuperBoard && window.__zegoSuperBoard.getCurrentBoard) === 'function') candidates.push((c) => zegoSuperBoard.getCurrentBoard().setBrushColor(c));
+      if (typeof zegoSuperBoard.getView === 'function') candidates.push((c) => zegoSuperBoard.getView().setBrushColor(c));
+
+      if (candidates.length === 0) {
+        console.warn('No known setBrushColor method found on SuperBoard. Object keys:', Object.keys(zegoSuperBoard));
+        return;
+      }
+
+      // Try candidates sequentially until one succeeds
+      (async () => {
+        for (const fn of candidates) {
+          try {
+            const res = tryCall(fn, color);
+            await res;
+            console.log('Color applied via candidate, color=', color);
+            return;
+          } catch (err) {
+            console.debug('candidate failed:', err);
+            // try next
+          }
+        }
+        console.warn('All candidate methods failed to apply color. SuperBoard object:', zegoSuperBoard);
+      })();
+    } catch (e) {
+      console.error('Error applying color:', e, 'SuperBoard:', zegoSuperBoard);
+    }
   };
+
+
 
   return (
     <div className="h-[100vh] bg-black w-full flex">
+      {connectionError && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded z-[200] shadow max-w-[90vw]">
+          <div className="font-semibold">WebSocket/Room error</div>
+          <pre className="text-xs mt-1 whitespace-pre-wrap break-words max-h-40 overflow-auto">{formatError(connectionError)}</pre>
+        </div>
+      )}
+      <Tools currentTool={currentTool} onClick={handleToolClick} isBoardReady={!!zegoSuperBoard} setColor={setColor} selectedColor={selectedColor} />
       <div
         id="parentDomID"
-        style={{ width: '100%', height: '100%', backgroundColor: 'white' }}
+        style={{ flex: 1, height: '100%', backgroundColor: 'white' }}
       />
-      <Tools currentTool={currentTool} onClick={handleToolClick} />
     </div>
   );
 }
