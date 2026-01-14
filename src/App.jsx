@@ -13,7 +13,7 @@ function App() {
   const [backgroundColor, setBackgroundColor] = useState('#FFFFFF');
 
   const token =
-"04AAAAAGlpQKQADIUqnXmtiuG46AsOQwCwKX/sKlA9JwnC/DgjcsTGtYnqhLbTRDb10q4F8kD1eDOPgwjYg8pj6S4MAYsc/BVkETXlowx98kSGkRx7oTnxyeJfs5KDMvVQBF40DtWQpLbEoS+fqITJ9wp3Wjevwh1Q2lPrNj2m3RHUOsuHs9jvRUqxIjVUfokhSicgy83Gsr0UyzWVFL1NNy9iNHYyhEnDlZ+79+2M0W7U6D0Yt372/KfbSSD4hLs52YN/BPYphiUB"
+"04AAAAAGlpRVUADL94uV0UNhZKDpOzGwCwYN29cUHHVi/QU80IviZnc0pHj6ityF4SgulTvc5p49C8QgVAW3kIRgynR9T7ttXz/NWYcxbE9bUXu/vwxJj5pHzKEJ2xEwQngtoidR95lEKeidPBjMLkirOyQmS5sNPOMUO/tFykxQmAf80tXEBhdBeDP+1Fso3NeVIN5UaHXEiGTxAaZ3qwoJjToKrBIEwrIyNcW1soBg4FTZ5JPxJM3YRlnakZTExu7uzP4pzwtqIB"
   const server = "wss://webliveroom1360633089-api.coolzcloud.com/ws"
 
   const initBoard = async () => {
